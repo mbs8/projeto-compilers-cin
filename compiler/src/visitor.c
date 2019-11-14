@@ -4,10 +4,11 @@
 #include <assert.h>
 #include "visitor.h"
 
-#define printm(...)// printf(__VA_ARGS__)
+#define printm(...) printf(__VA_ARGS__)
 #define printb(...) printf(__VA_ARGS__)
 
 FILE *fp;
+int tempVars = 0;
 
 void visit_file (AST *root) {
 	printm(">>> file\n");
@@ -15,7 +16,7 @@ void visit_file (AST *root) {
 	printm("file has %d declarations\n", root->list.num_items);
 	
 	// prints filename to IR file
-	fprintf(fp, "source_filename = \"%s\"\n", root->list.first->ast->decl.function.token->filename);
+	// fprintf(fp, "source_filename = \"%s\"\n", root->list.first->ast->decl.function.token->filename);
 
 	for (ListNode *ptr = root->list.first; ptr != NULL; ptr = ptr->next) {
 		switch (ptr->ast->decl.type) {
@@ -63,11 +64,11 @@ void visit_function_decl (AST *ast) {
 		}
 		printm("\n");
 	}
-	fprintf(fp, ") #0 {\n");
+	fprintf(fp, ") #0 {");
 	if (ast->decl.function.stat_block != NULL) {
 		visit_stat_block(ast->decl.function.stat_block, params, ast->decl.function.type);
 	}
-	fprintf(fp, "}");
+	fprintf(fp, "\n}");
 	printm("<<< function_decl\n");
 }
 
@@ -119,15 +120,17 @@ void visit_var_decl (AST *ast) {
 	{
 		fprintf(fp, "\n@%s = common global i32 0, align 4", id->id.string);
 	}
-	printm("<<< var_decl");
+	printm("<<< var_decl\n");
 }
 
 void visit_var_decl_local (AST *ast) {
 	printm(">>> var_decl_local\n");
 	AST *id = ast->decl.variable.id;
-
+	fprintf(fp, "\n  %%%s = alloca i32, align 4", id->id.string);
 	if (ast->decl.variable.expr != NULL) {
 		ExprResult expr = visit_expr(ast->decl.variable.expr);
+		id->id.int_value = expr.int_value;
+		fprintf(fp, "\n  store i32 %ld, i32* %%%s, align 4", id->id.int_value, id->id.string);
 	}
 	printm("<<< var_decl_local\n");
 }
@@ -138,13 +141,14 @@ ExprResult visit_return_stat (AST *ast) {
 	if (ast->stat.ret.expr) {
 		ret = visit_expr(ast->stat.ret.expr);
 	}
-	return ret;
 	printm("<<< return stat\n");
+	return ret;
 }
 
 void visit_assign_stat (AST *assign) {
 	printm(">>> assign stat\n");
 	ExprResult expr = visit_expr(assign->stat.assign.expr);
+	assign->id.int_value = expr.int_value;
 	printm("<<< assign stat\n");
 }
 
@@ -226,6 +230,7 @@ ExprResult visit_unary_minus (AST *ast) {
 	printm(">>> unary_minus\n");
 	ExprResult expr, ret = {};
 	expr = visit_expr(ast->expr.unary_minus.expr);
+	ret.int_value = -expr.int_value;
 	printm("<<< unary_minus\n");
 	return ret;
 }
@@ -235,6 +240,7 @@ ExprResult visit_add (AST *ast) {
 	ExprResult left, right, ret = {};
 	left  = visit_expr(ast->expr.binary_expr.left_expr);
 	right = visit_expr(ast->expr.binary_expr.right_expr);
+	ret.int_value = left.int_value + right.int_value;
 	printm("<<< add\n");
 	return ret;
 }
@@ -244,6 +250,7 @@ ExprResult visit_sub (AST *ast) {
 	ExprResult left, right, ret = {};
 	left  = visit_expr(ast->expr.binary_expr.left_expr);
 	right = visit_expr(ast->expr.binary_expr.right_expr);
+	ret.int_value = left.int_value - right.int_value;
 	printm("<<< sub\n");
 	return ret;
 }
@@ -253,6 +260,7 @@ ExprResult visit_mul (AST *ast) {
 	ExprResult left, right, ret = {};
 	left  = visit_expr(ast->expr.binary_expr.left_expr);
 	right = visit_expr(ast->expr.binary_expr.right_expr);
+	ret.int_value = left.int_value * right.int_value;
 	printm("<<< mul\n");
 	return ret;
 }
@@ -262,6 +270,7 @@ ExprResult visit_div (AST *ast) {
 	ExprResult left, right, ret = {};
 	left  = visit_expr(ast->expr.binary_expr.left_expr);
 	right = visit_expr(ast->expr.binary_expr.right_expr);
+	ret.int_value = left.int_value / right.int_value;
 	printm("<<< div\n");
 	return ret;
 }
@@ -271,6 +280,7 @@ ExprResult visit_mod (AST *ast) {
 	ExprResult left, right, ret = {};
 	left  = visit_expr(ast->expr.binary_expr.left_expr);
 	right = visit_expr(ast->expr.binary_expr.right_expr);
+	ret.int_value = left.int_value % right.int_value;
 	printm("<<< mod\n");
 	return ret;
 }
