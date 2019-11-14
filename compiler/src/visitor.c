@@ -4,7 +4,7 @@
 #include <assert.h>
 #include "visitor.h"
 
-#define printm(...) //printf(__VA_ARGS__)
+#define printm(...)// printf(__VA_ARGS__)
 #define printb(...) printf(__VA_ARGS__)
 
 FILE *fp;
@@ -15,7 +15,7 @@ void visit_file (AST *root) {
 	printm("file has %d declarations\n", root->list.num_items);
 	
 	// prints filename to IR file
-	fprintf(fp, "source_filename = \"%s\"\n\n", root->list.first->ast->decl.function.token->filename);
+	fprintf(fp, "source_filename = \"%s\"\n", root->list.first->ast->decl.function.token->filename);
 
 	for (ListNode *ptr = root->list.first; ptr != NULL; ptr = ptr->next) {
 		switch (ptr->ast->decl.type) {
@@ -35,15 +35,39 @@ void visit_file (AST *root) {
 void visit_function_decl (AST *ast) {
 	printm(">>> function_decl\n");
 	AST *params = ast->decl.function.param_decl_list;
+	
+	fprintf(fp, "\n\ndefine ");
+	switch (ast->decl.function.type)
+	{
+	case TYPE_VOID:
+		fprintf(fp, "void ");
+		break;
+	case TYPE_INT:
+		fprintf(fp, "i32 ");
+	default:
+		break;
+	}
+	
+	fprintf(fp, "@%s(", ast->decl.function.id->id.string);
+
 	if (params != NULL) {
-		for (int i = 0; i < params->list.num_items; i++) {
-			printm("  param");
+		for (int i = 1; i <= params->list.num_items; i++) {
+			if (i == params->list.num_items)
+			{
+				fprintf(fp, "i32");
+			}
+			else
+			{
+				fprintf(fp, "i32, ");
+			}
 		}
 		printm("\n");
 	}
+	fprintf(fp, ") #0 {\n");
 	if (ast->decl.function.stat_block != NULL) {
 		visit_stat_block(ast->decl.function.stat_block, params, ast->decl.function.type);
 	}
+	fprintf(fp, "}");
 	printm("<<< function_decl\n");
 }
 
@@ -89,13 +113,13 @@ void visit_var_decl (AST *ast) {
 
 	if (id->id.int_value != 0)
 	{
-		fprintf(fp, "@%s = global i32 %ld, align 4\n", id->id.string, id->id.int_value);
+		fprintf(fp, "\n@%s = global i32 %ld, align 4", id->id.string, id->id.int_value);
 	} 
 	else
 	{
-		fprintf(fp, "@%s = common global i32 0, align 4\n", id->id.string);
+		fprintf(fp, "\n@%s = common global i32 0, align 4", id->id.string);
 	}
-	printm("<<< var_decl\n");
+	printm("<<< var_decl");
 }
 
 void visit_var_decl_local (AST *ast) {
