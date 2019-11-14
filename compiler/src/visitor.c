@@ -4,11 +4,18 @@
 #include <assert.h>
 #include "visitor.h"
 
-#define printm(...) printf(__VA_ARGS__)
+#define printm(...) //printf(__VA_ARGS__)
+#define printb(...) printf(__VA_ARGS__)
+
+FILE *fp;
 
 void visit_file (AST *root) {
 	printm(">>> file\n");
+	fp = fopen("test_result.ll", "w");
 	printm("file has %d declarations\n", root->list.num_items);
+	
+	// prints filename to IR file
+	fprintf(fp, "source_filename = \"%s\"\n\n", root->list.first->ast->decl.function.token->filename);
 
 	for (ListNode *ptr = root->list.first; ptr != NULL; ptr = ptr->next) {
 		switch (ptr->ast->decl.type) {
@@ -22,6 +29,7 @@ void visit_file (AST *root) {
 		}
 	}
 	printm("<<< file\n");
+	fclose(fp);
 }
 
 void visit_function_decl (AST *ast) {
@@ -57,7 +65,7 @@ ExprResult visit_stat (AST *stat) {
 	ExprResult ret = { 0, TYPE_VOID };
 	switch (stat->stat.type) {
 	case VARIABLE_DECLARATION:
-		visit_var_decl(stat); break;
+		visit_var_decl_local(stat); break;
 	case ASSIGN_STATEMENT:
 		visit_assign_stat(stat); break;
 	case RETURN_STATEMENT:
@@ -72,14 +80,33 @@ ExprResult visit_stat (AST *stat) {
 
 void visit_var_decl (AST *ast) {
 	printm(">>> var_decl\n");
+	AST *id = ast->decl.variable.id;	
+	
+	if (ast->decl.variable.expr != NULL) {
+		ExprResult expr = visit_expr(ast->decl.variable.expr);
+		id->id.int_value = expr.int_value;
+	}
+
+	if (id->id.int_value != 0)
+	{
+		fprintf(fp, "@%s = global i32 %ld, align 4\n", id->id.string, id->id.int_value);
+	} 
+	else
+	{
+		fprintf(fp, "@%s = common global i32 0, align 4\n", id->id.string);
+	}
+	printm("<<< var_decl\n");
+}
+
+void visit_var_decl_local (AST *ast) {
+	printm(">>> var_decl_local\n");
 	AST *id = ast->decl.variable.id;
 
 	if (ast->decl.variable.expr != NULL) {
 		ExprResult expr = visit_expr(ast->decl.variable.expr);
 	}
-	printm("<<< var_decl\n");
+	printm("<<< var_decl_local\n");
 }
-
 
 ExprResult visit_return_stat (AST *ast) {
 	printm(">>> return stat\n");
@@ -166,6 +193,7 @@ ExprResult visit_id (AST *ast) {
 ExprResult visit_literal (AST *ast) {
 	printm(">>> literal\n");
 	ExprResult ret = {};
+	ret.int_value = ast->expr.literal.int_value;
 	printm("<<< literal\n");
 	return ret;
 }

@@ -25,6 +25,7 @@ ExprResult visit_stat (AST *stat);
 ExprResult visit_return_stat (AST *assign);
 void visit_assign_stat (AST *assign);
 void visit_var_decl (AST *ast);
+void visit_var_decl_local (AST *ast);
 void visit_function_decl (AST *ast);
 ExprResult visit_stat_block (AST *stat_block, AST *params, int return_type);
 ExprResult visit_expr (AST *expr);
