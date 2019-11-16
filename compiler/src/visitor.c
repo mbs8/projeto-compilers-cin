@@ -8,7 +8,7 @@
 #define printb(...) printf(__VA_ARGS__)
 
 FILE *fp;
-int tempVars = 0;
+int tempVars = 0;        // variável para indicar o indice atual das variáveis temporárias
 
 void visit_file (AST *root) {
 	printm(">>> file\n");
@@ -16,7 +16,7 @@ void visit_file (AST *root) {
 	printm("file has %d declarations\n", root->list.num_items);
 	
 	// prints filename to IR file
-	// fprintf(fp, "source_filename = \"%s\"\n", root->list.first->ast->decl.function.token->filename);
+	fprintf(fp, "source_filename = \"%s\"\n", root->list.first->ast->decl.function.token->filename);
 
 	for (ListNode *ptr = root->list.first; ptr != NULL; ptr = ptr->next) {
 		switch (ptr->ast->decl.type) {
@@ -61,6 +61,8 @@ void visit_function_decl (AST *ast) {
 			{
 				fprintf(fp, "i32, ");
 			}
+			tempVars++;
+			printm("param ");
 		}
 		printm("\n");
 	}
@@ -69,6 +71,7 @@ void visit_function_decl (AST *ast) {
 		visit_stat_block(ast->decl.function.stat_block, params, ast->decl.function.type);
 	}
 	fprintf(fp, "\n}");
+	tempVars = 0;
 	printm("<<< function_decl\n");
 }
 
@@ -77,6 +80,15 @@ ExprResult visit_stat_block (AST *stat_block, AST *params, int return_type) {
 	printm(">>> stat_block\n");
 	ExprResult ret = { 0, TYPE_VOID };
 
+	for (ListNode *ptr = stat_block->list.first; ptr != NULL; ptr = ptr->next) {
+		if(ptr->ast->stat.type == VARIABLE_DECLARATION)
+		{
+			AST *id = ptr->ast->decl.variable.id;
+			tempVars++;
+			sprintf(id->id.string, "%d", tempVars);
+			fprintf(fp, "\n  %%%d = alloca i32, align 4", tempVars);
+		}
+	}
 	for (ListNode *ptr = stat_block->list.first; ptr != NULL; ptr = ptr->next) {
 		ret = visit_stat(ptr->ast);
 	}
@@ -99,8 +111,8 @@ ExprResult visit_stat (AST *stat) {
 		visit_expr(stat->stat.expr.expr); break;
 		default: fprintf(stderr, "UNKNOWN STATEMENT TYPE %c\n", stat->stat.type); break;
 	}
-	return ret;
 	printm("<<< statement\n");
+	return ret;
 }
 
 void visit_var_decl (AST *ast) {
@@ -110,15 +122,11 @@ void visit_var_decl (AST *ast) {
 	if (ast->decl.variable.expr != NULL) {
 		ExprResult expr = visit_expr(ast->decl.variable.expr);
 		id->id.int_value = expr.int_value;
+		fprintf(fp, "\n@%s = local_unnamed_addr global i32 %ld, align 4", id->id.string, id->id.int_value);
 	}
-
-	if (id->id.int_value != 0)
-	{
-		fprintf(fp, "\n@%s = global i32 %ld, align 4", id->id.string, id->id.int_value);
-	} 
 	else
 	{
-		fprintf(fp, "\n@%s = common global i32 0, align 4", id->id.string);
+		fprintf(fp, "\n@%s = common local_unnamed_addr global i32 0, align 4", id->id.string);
 	}
 	printm("<<< var_decl\n");
 }
@@ -126,7 +134,7 @@ void visit_var_decl (AST *ast) {
 void visit_var_decl_local (AST *ast) {
 	printm(">>> var_decl_local\n");
 	AST *id = ast->decl.variable.id;
-	fprintf(fp, "\n  %%%s = alloca i32, align 4", id->id.string);
+
 	if (ast->decl.variable.expr != NULL) {
 		ExprResult expr = visit_expr(ast->decl.variable.expr);
 		id->id.int_value = expr.int_value;
@@ -210,6 +218,8 @@ ExprResult visit_id (AST *ast) {
 	if (ast->id.type == TYPE_INT) {
 		ret.int_value = ast->id.int_value;
 		ret.type = TYPE_INT;
+		tempVars++;
+		fprintf(fp, "\n  %%%d = load i32, i32* %%%s, align 4", tempVars, ast->id.string);
 	} else if (ast->id.type == TYPE_FLOAT) {
 		ret.float_value = ast->id.float_value;
 		ret.type = TYPE_FLOAT;
@@ -241,6 +251,24 @@ ExprResult visit_add (AST *ast) {
 	left  = visit_expr(ast->expr.binary_expr.left_expr);
 	right = visit_expr(ast->expr.binary_expr.right_expr);
 	ret.int_value = left.int_value + right.int_value;
+
+		if (left.type == FLOAT_CONSTANT)
+	{
+		tempVars++;
+		if (right.type == FLOAT_CONSTANT)
+		{
+			fprintf(fp, "\n  %%%d = add nsw i32 %%%s, %%%s", tempVars, ast->expr.binary_expr.left_expr->expr.id.id->id.string, ast->expr.binary_expr.right_expr->expr.id.id->id.string);
+		}
+		else
+		{
+			fprintf(fp, "\n  %%%d = add nsw i32 %%%s, %ld", tempVars, ast->expr.binary_expr.left_expr->expr.id.id->id.string, right.int_value);
+		}
+	}
+	else if(right.type == FLOAT_CONSTANT)
+	{
+		tempVars++;
+		fprintf(fp, "\n  %%%d = add nsw i32 %ld, %%%s", tempVars, left.int_value, ast->expr.binary_expr.right_expr->expr.id.id->id.string);
+	}
 	printm("<<< add\n");
 	return ret;
 }
@@ -251,6 +279,24 @@ ExprResult visit_sub (AST *ast) {
 	left  = visit_expr(ast->expr.binary_expr.left_expr);
 	right = visit_expr(ast->expr.binary_expr.right_expr);
 	ret.int_value = left.int_value - right.int_value;
+
+	if (left.type == FLOAT_CONSTANT)
+	{
+		tempVars++;
+		if (right.type == FLOAT_CONSTANT)
+		{
+			fprintf(fp, "\n  %%%d = sub nsw i32 %%%s, %%%s", tempVars, ast->expr.binary_expr.left_expr->expr.id.id->id.string, ast->expr.binary_expr.right_expr->expr.id.id->id.string);
+		}
+		else
+		{
+			fprintf(fp, "\n  %%%d = sub nsw i32 %%%s, %ld", tempVars, ast->expr.binary_expr.left_expr->expr.id.id->id.string, right.int_value);
+		}
+	}
+	else if(right.type == FLOAT_CONSTANT)
+	{
+		tempVars++;
+		fprintf(fp, "\n  %%%d = sub nsw i32 %ld, %%%s", tempVars, left.int_value, ast->expr.binary_expr.right_expr->expr.id.id->id.string);
+	}
 	printm("<<< sub\n");
 	return ret;
 }
@@ -261,6 +307,24 @@ ExprResult visit_mul (AST *ast) {
 	left  = visit_expr(ast->expr.binary_expr.left_expr);
 	right = visit_expr(ast->expr.binary_expr.right_expr);
 	ret.int_value = left.int_value * right.int_value;
+	if (left.type == FLOAT_CONSTANT)
+	{
+		tempVars++;
+		if (right.type == FLOAT_CONSTANT)
+		{
+			fprintf(fp, "\n  %%%d = mul i32 %%%s, %%%s", tempVars, ast->expr.binary_expr.left_expr->expr.id.id->id.string, ast->expr.binary_expr.right_expr->expr.id.id->id.string);
+		}
+		else
+		{
+			fprintf(fp, "\n  %%%d = mul i32 %%%s, %ld", tempVars, ast->expr.binary_expr.left_expr->expr.id.id->id.string, right.int_value);
+		}
+	}
+	else if(right.type == FLOAT_CONSTANT)
+	{
+		tempVars++;
+		fprintf(fp, "\n  %%%d = mul i32 %ld, %%%s", tempVars, left.int_value, ast->expr.binary_expr.right_expr->expr.id.id->id.string);
+	}
+
 	printm("<<< mul\n");
 	return ret;
 }
@@ -270,7 +334,28 @@ ExprResult visit_div (AST *ast) {
 	ExprResult left, right, ret = {};
 	left  = visit_expr(ast->expr.binary_expr.left_expr);
 	right = visit_expr(ast->expr.binary_expr.right_expr);
-	ret.int_value = left.int_value / right.int_value;
+	if (right.int_value != 0)
+	{
+		ret.int_value = left.int_value % right.int_value;	
+	}
+
+	if (left.type == FLOAT_CONSTANT)
+	{
+		tempVars++;
+		if (right.type == FLOAT_CONSTANT)
+		{
+			fprintf(fp, "\n  %%%d = sdiv i32 %%%s, %%%s", tempVars, ast->expr.binary_expr.left_expr->expr.id.id->id.string, ast->expr.binary_expr.right_expr->expr.id.id->id.string);
+		}
+		else
+		{
+			fprintf(fp, "\n  %%%d = sdiv i32 %%%s, %ld", tempVars, ast->expr.binary_expr.left_expr->expr.id.id->id.string, right.int_value);
+		}
+	}
+	else if(right.type == FLOAT_CONSTANT)
+	{
+		tempVars++;
+		fprintf(fp, "\n  %%%d = sdiv i32 %ld, %%%s", tempVars, left.int_value, ast->expr.binary_expr.right_expr->expr.id.id->id.string);
+	}
 	printm("<<< div\n");
 	return ret;
 }
@@ -280,7 +365,30 @@ ExprResult visit_mod (AST *ast) {
 	ExprResult left, right, ret = {};
 	left  = visit_expr(ast->expr.binary_expr.left_expr);
 	right = visit_expr(ast->expr.binary_expr.right_expr);
-	ret.int_value = left.int_value % right.int_value;
+	
+	if (right.int_value != 0)
+	{
+		ret.int_value = left.int_value % right.int_value;	
+	}
+
+	if (left.type == FLOAT_CONSTANT)
+	{
+		tempVars++;
+		if (right.type == FLOAT_CONSTANT)
+		{
+			fprintf(fp, "\n  %%%d = srem i32 %%%s, %%%s", tempVars, ast->expr.binary_expr.left_expr->expr.id.id->id.string, ast->expr.binary_expr.right_expr->expr.id.id->id.string);
+		}
+		else
+		{
+			fprintf(fp, "\n  %%%d = srem i32 %%%s, %ld", tempVars, ast->expr.binary_expr.left_expr->expr.id.id->id.string, right.int_value);
+		}
+	}
+	else if(right.type == FLOAT_CONSTANT)
+	{
+		tempVars++;
+		fprintf(fp, "\n  %%%d = srem i32 %ld, %%%s", tempVars, left.int_value, ast->expr.binary_expr.right_expr->expr.id.id->id.string);
+	}
+	
 	printm("<<< mod\n");
 	return ret;
 }
