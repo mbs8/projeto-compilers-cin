@@ -3,58 +3,39 @@ source_filename = "test.c"
 target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-apple-macosx10.15.0"
 
+@nom_nom = global i32 88, align 4
+@arroz = common global i32 0, align 4
+
 ; Function Attrs: noinline nounwind optnone ssp uwtable
 define i32 @aqua_baldo() #0 {
   %1 = alloca i32, align 4
   %2 = alloca i32, align 4
   %3 = alloca i32, align 4
-  store i32 160, i32* %1, align 4
-  %4 = load i32, i32* %1, align 4
-  %5 = srem i32 %4, 11
-  %6 = sub nsw i32 %5, 2
-  store i32 %6, i32* %2, align 4
-  %7 = load i32, i32* %2, align 4
-  %8 = add nsw i32 6, %7
-  %9 = srem i32 11, %8
-  store i32 %9, i32* %3, align 4
-  %10 = load i32, i32* %1, align 4
-  %11 = sub nsw i32 1, %10
-  %12 = load i32, i32* %2, align 4
-  %13 = load i32, i32* %3, align 4
-  %14 = srem i32 %12, %13
-  %15 = add nsw i32 %11, %14
-  ret i32 %15
-}
-
-; Function Attrs: noinline nounwind optnone ssp uwtable
-define i32 @function7(i32, i32) #0 {
-  %3 = alloca i32, align 4
-  %4 = alloca i32, align 4
-  %5 = alloca i32, align 4
-  store i32 %0, i32* %3, align 4
-  store i32 %1, i32* %4, align 4
-  %6 = load i32, i32* %3, align 4
-  %7 = load i32, i32* %4, align 4
-  %8 = srem i32 %6, %7
-  store i32 %8, i32* %5, align 4
-  %9 = load i32, i32* %3, align 4
-  %10 = sub nsw i32 0, %9
-  %11 = load i32, i32* %4, align 4
-  %12 = load i32, i32* %5, align 4
-  %13 = add nsw i32 %11, %12
-  %14 = mul nsw i32 %10, %13
-  store i32 %14, i32* %4, align 4
-  %15 = load i32, i32* %5, align 4
-  %16 = load i32, i32* %4, align 4
-  %17 = sdiv i32 %16, 2
-  %18 = sub nsw i32 %15, %17
-  ret i32 %18
+  %4 = load i32, i32* @nom_nom, align 4
+  %5 = sub nsw i32 160, %4
+  store i32 %5, i32* %1, align 4
+  %6 = load i32, i32* %1, align 4
+  %7 = srem i32 %6, 9
+  store i32 %7, i32* %2, align 4
+  %8 = load i32, i32* %2, align 4
+  %9 = add nsw i32 6, %8
+  %10 = srem i32 11, %9
+  store i32 %10, i32* %3, align 4
+  %11 = load i32, i32* %1, align 4
+  %12 = sub nsw i32 1, %11
+  %13 = load i32, i32* %2, align 4
+  %14 = load i32, i32* %3, align 4
+  %15 = srem i32 %13, %14
+  %16 = add nsw i32 %12, %15
+  ret i32 %16
 }
 
 ; Function Attrs: noinline nounwind optnone ssp uwtable
 define i32 @main() #0 {
   %1 = alloca i32, align 4
   store i32 0, i32* %1, align 4
+  %2 = call i32 @aqua_baldo()
+  store i32 %2, i32* @nom_nom, align 4
   ret i32 0
 }
 
